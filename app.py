@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit import secrets
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
@@ -9,6 +10,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI 
 from htmlTemplates import css,bot_template,user_template
 import os
+import requests
 
 def get_pdf_text(pdf_list):
     text=""
@@ -49,14 +51,27 @@ def get_conversation_chain(vector_store):
 
 
 def handle_userInput(user_question):
-    response=st.session_state.conversation({'question':user_question})
-    st.session_state.chat_history=response['chat_history']
+    api_url = "https://api.together.xyz/v1/chat/completions"
+    api_key = secrets.TOGETHER_API_KEY
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
+        "messages": [{"role": "user", "content": user_question}],
+        "max_tokens": 2512,
+        "temperature": 0.7,
+        "top_p": 0.7,
+        "top_k": 50,
+        "repetition_penalty": 1,
+        "stop": "[\"\\n\"]",
+        "stream": True
+    }
+    response = requests.post(api_url, headers=headers, json=data)
+    response_json = response.json()
+    st.write(response_json["message"]["content"])
 
-    for i, msg in enumerate(st.session_state.chat_history):
-        if i%2==0:
-            st.write(user_template.replace("{{MSG}}",msg.content),unsafe_allow_html=True)
-        else:
-            st.write(bot_template.replace("{{MSG}}",msg.content),unsafe_allow_html=True)
 
 def main():
     load_dotenv()
